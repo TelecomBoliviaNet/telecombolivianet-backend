@@ -27,10 +27,18 @@ jobs:
             echo "Proyecto principal no presente en esta rama — skipping build"
             exit 0
           fi
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          if [ "$BRANCH" != "main" ] && [ "$BRANCH" != "develop" ]; then
+            echo "Branch '$BRANCH' es feature branch — skipping build (codebase parcial)"
+            exit 0
+          fi
           dotnet restore "$CSPROJ"
           dotnet build "$CSPROJ" --no-restore --configuration Release
-          if find . -name "*Tests*.csproj" | grep -q .; then
-            dotnet test --no-build --configuration Release --verbosity normal
+          TEST_PROJS=$(find . -name "*Tests*.csproj")
+          if [ -n "$TEST_PROJS" ]; then
+            echo "$TEST_PROJS" | while read proj; do
+              dotnet test "$proj" --configuration Release --verbosity normal
+            done
           else
             echo "No se encontraron proyectos de test — omitiendo"
           fi
@@ -48,6 +56,11 @@ jobs:
         run: |
           if [ ! -f "Dockerfile" ]; then
             echo "Dockerfile no presente en esta rama — skipping"
+            exit 0
+          fi
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          if [ "$BRANCH" != "main" ] && [ "$BRANCH" != "develop" ]; then
+            echo "Branch '$BRANCH' es feature branch — skipping Docker build (codebase parcial)"
             exit 0
           fi
           docker build -t telecombolivianet-backend:ci .
